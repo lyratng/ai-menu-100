@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LayoutDashboard, Store, Menu as MenuIcon, TrendingUp, Users, AlertCircle } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface MenuTrendItem {
   date: string;
@@ -52,9 +53,9 @@ export default function AdminDashboardPage() {
 
         // 并行请求三个接口
         const [statsRes, trendRes, methodsRes] = await Promise.all([
-          fetch('http://localhost:8080/api/admin/dashboard/stats', { headers }),
-          fetch('http://localhost:8080/api/admin/dashboard/menu-trend?days=30', { headers }),
-          fetch('http://localhost:8080/api/admin/dashboard/cook-methods', { headers }),
+          fetch(`${API_URL}/api/admin/dashboard/stats`, { headers }),
+          fetch(`${API_URL}/api/admin/dashboard/menu-trend?days=30`, { headers }),
+          fetch(`${API_URL}/api/admin/dashboard/cook-methods`, { headers }),
         ]);
 
         // 检查响应状态

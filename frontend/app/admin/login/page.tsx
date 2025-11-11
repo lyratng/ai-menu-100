@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { API_URL } from '@/lib/config';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function AdminLoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8080/api/admin/login', {
+      const response = await fetch(`${API_URL}/api/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
