@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #F5F5F0;
+    --foreground: #2C2C2C;
+    --border: #E8E8E3;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* 滚动条样式 */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-foreground/20;
+  }
+}
+
+@layer components {
+  /* 按钮基础样式 */
+  .btn {
+    @apply h-12 px-6 rounded-full font-body transition-all duration-300;
+    font-weight: 500;
+  }
+
+  .btn-primary {
+    @apply btn bg-foreground text-white hover:shadow-button hover:scale-[0.98] active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply btn bg-secondary text-foreground hover:bg-foreground hover:text-white;
+  }
+
+  .btn-ghost {
+    @apply btn hover:bg-secondary;
+  }
+
+  /* 卡片样式 */
+  .card {
+    @apply bg-white border border-border rounded-lg shadow-card transition-shadow duration-300;
+  }
+
+  .card:hover {
+    @apply shadow-card-hover;
+  }
+
+  /* 输入框样式 */
+  .input {
+    @apply h-12 px-4 rounded-lg border border-border bg-white text-foreground placeholder:text-disabled;
+    @apply focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground;
+    @apply transition-all duration-200;
+  }
+
+  /* 容器样式 */
+  .container-main {
+    @apply max-w-[1000px] mx-auto px-page py-section;
+  }
+
+  /* 表格样式 */
+  th {
+    font-weight: 600;
+  }
+
+  /* 数字和数据展示 */
+  .data-value {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 强调文本 */
+  strong, .font-emphasis {
+    font-weight: 500;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* 玻璃效果 */
+  .glass {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* 玻璃效果（用于下拉选项）- 超强毛玻璃：30%不透明度 */
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.3) !important;
+    backdrop-filter: blur(32px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(200%) !important;
+  }
+}
+

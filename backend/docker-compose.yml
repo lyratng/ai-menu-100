@@ -1,0 +1,56 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    container_name: ai-menu-api
+    env_file: .env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - ai-menu-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-menu-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - ai-menu-network
+    command: redis-server --appendonly yes
+
+  nginx:
+    image: nginx:alpine
+    container_name: ai-menu-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro  # SSL证书目录
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - ai-menu-network
+
+networks:
+  ai-menu-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+

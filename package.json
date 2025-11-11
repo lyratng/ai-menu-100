@@ -1,0 +1,28 @@
+{
+  "name": "ai-menu-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "炊语智能菜单生成系统 - Monorepo",
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:admin": "pnpm --filter admin dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:all": "concurrently \"pnpm dev:frontend\" \"pnpm dev:admin\" \"pnpm dev:backend\"",
+    "build:frontend": "pnpm --filter frontend build",
+    "build:admin": "pnpm --filter admin build",
+    "build:backend": "pnpm --filter backend build",
+    "build:all": "pnpm build:frontend && pnpm build:admin && pnpm build:backend",
+    "type-check": "pnpm --recursive run type-check",
+    "lint": "pnpm --recursive run lint",
+    "clean": "pnpm --recursive run clean"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}
+
