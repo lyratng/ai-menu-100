@@ -146,13 +146,44 @@ export async function login(username: string, password: string) {
 export async function register(data: {
   username: string;
   password: string;
-  confirm_password?: string;
-  storeName?: string;
-  store_name?: string;
-  contact_person: string;
-  contact_phone: string;
+  confirm_password: string;
+  storeName: string;
+  contactPerson?: string;
+  contactPhone?: string;
   address?: string;
-  defaultConfig?: any;
+  defaultConfig: {
+    breakfast?: {
+      coldDish?: number;
+      pickle?: number;
+      westernDessert?: number;
+      soupPorridge?: number;
+      specialStaple?: number;
+      egg?: number;
+    };
+    lunch: {
+      coldDish: number;
+      hotDish: number;
+      soupPorridge?: number;
+      westernDessert?: number;
+      specialStaple?: number;
+      specialFood?: number;
+    };
+    dinner?: {
+      coldDish?: number;
+      hotDish?: number;
+      soupPorridge?: number;
+      westernDessert?: number;
+      specialStaple?: number;
+      specialFood?: number;
+    };
+    lateNight?: {
+      coldDish?: number;
+      hotDish?: number;
+      soupPorridge?: number;
+      specialStaple?: number;
+      specialFood?: number;
+    };
+  };
 }) {
   const response = await api.auth.register(data);
   return response;
@@ -160,6 +191,6 @@ export async function register(data: {
 
 export async function generateMenu(data: any): Promise<ApiResponse> {
   const response = await api.menu.generate(data);
-  return response as ApiResponse;
+  return response as unknown as ApiResponse;
 }
 

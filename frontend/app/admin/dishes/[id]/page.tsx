@@ -31,16 +31,23 @@ export default function DishDetailPage() {
   const router = useRouter();
   const [dish, setDish] = useState<DishDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState<'common' | 'store'>('store');
 
   useEffect(() => {
-    fetchDishDetail();
+    // 从URL获取source参数
+    const searchParams = new URLSearchParams(window.location.search);
+    const sourceParam = searchParams.get('source') as 'common' | 'store' | null;
+    if (sourceParam) {
+      setSource(sourceParam);
+    }
+    fetchDishDetail(sourceParam || 'store');
   }, [params.id]);
 
-  const fetchDishDetail = async () => {
+  const fetchDishDetail = async (dishSource: 'common' | 'store') => {
     setLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/dishes/${params.id}`, {
+      const response = await fetch(`http://localhost:8080/api/admin/dishes/${params.id}?source=${dishSource}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -61,7 +68,7 @@ export default function DishDetailPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/dishes/${params.id}`, {
+      const response = await fetch(`http://localhost:8080/api/admin/dishes/${params.id}?source=${source}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });

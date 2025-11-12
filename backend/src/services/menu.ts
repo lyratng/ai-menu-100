@@ -92,17 +92,16 @@ export async function generateMenu(
     }
   }
   
-  // 2. 计算需要检索的菜品数量
+  // 2. 计算需要的菜品数量
   const totalDishesPerWeek = (request.hot_dish_total_per_day + request.cold_per_day) * request.days;
-  const historyDishCount = Math.round(totalDishesPerWeek * request.used_history_ratio);
-  const commonDishCount = totalDishesPerWeek - historyDishCount;
-  console.log(`需要菜品: ${totalDishesPerWeek}道 (专属${historyDishCount}, 通用${commonDishCount})`);
+  console.log(`📊 一周需要菜品: ${totalDishesPerWeek}道 (${request.hot_dish_total_per_day}热+${request.cold_per_day}凉) × ${request.days}天`);
   
-  // 3. 简化检索策略 - 直接获取所有可用菜品
+  // 3. 按比例从两个库获取菜品（10倍余量）
   console.log('🔍 获取菜品数据...');
   const dishes = await fetchAllAvailableDishes(
     request.store_id,
-    request.used_history_ratio
+    request.used_history_ratio,
+    totalDishesPerWeek
   );
   console.log(`✅ 获取到 ${dishes.length} 道菜品`);
   
@@ -409,226 +408,94 @@ export async function generateMenu(
 }
 
 /**
- * 获取所有可用菜品（按菜品类型分组，确保每种类型都有充足菜品）
+ * 获取可用菜品 - 按比例从两个库随机取菜
+ * 
+ * 新策略：
+ * 1. 计算需要的总菜品数：(热菜+凉菜) * 天数 * 10倍余量
+ * 2. 按历史菜占比分配到两个库
+ * 3. 从专属菜库随机取历史菜占比部分
+ * 4. 从通用菜库随机取剩余部分
+ * 5. 混合打乱，不标记来源
  */
 async function fetchAllAvailableDishes(
   storeId: string,
-  historyRatio: number
+  historyRatio: number,
+  totalDishesNeeded: number
 ): Promise<any[]> {
+  // 配置参数：余量倍数
+  const DISH_POOL_MULTIPLIER = 10;
+  
+  // 计算菜品池大小
+  const poolSize = totalDishesNeeded * DISH_POOL_MULTIPLIER;
+  const historyTarget = Math.round(poolSize * historyRatio);
+  const commonTarget = poolSize - historyTarget;
+  
+  console.log('\n📊 ===== 菜品获取策略 =====');
+  console.log(`每周需要菜品: ${totalDishesNeeded}道`);
+  console.log(`菜品池大小: ${poolSize}道 (${DISH_POOL_MULTIPLIER}倍余量)`);
+  console.log(`历史菜占比: ${(historyRatio * 100).toFixed(0)}%`);
+  console.log(`目标从专属菜库取: ${historyTarget}道`);
+  console.log(`目标从通用菜库取: ${commonTarget}道`);
+  console.log('============================\n');
+  
   const allDishes: any[] = [];
   
-  // 从专属菜库和历史菜单获取
-  if (historyRatio > 0) {
-    console.log('查询专属菜库...');
+  // 从专属菜库随机取菜
+  if (historyTarget > 0) {
+    console.log(`🔍 从专属菜库随机取 ${historyTarget} 道菜...`);
     const storeDishes = await query(
       `SELECT id, dish_name, dish_type, ingredient_tags, knife_skill, 
               cuisine, cook_method8, flavor, main_ingredients, sub_ingredients, seasons
        FROM dishes_store
        WHERE store_id = $1 AND is_active = TRUE
-       ORDER BY RANDOM()`,
-      [storeId]
+       ORDER BY RANDOM()
+       LIMIT $2`,
+      [storeId, historyTarget]
     );
+    
+    // 标记为历史菜品
+    storeDishes.rows.forEach((dish: any) => {
+      dish.from_history = true;
+    });
+    
     allDishes.push(...storeDishes.rows);
-    console.log(`专属菜库: ${storeDishes.rows.length}道`);
-    
-    // 从历史菜单中提取菜品（特别是上传的菜单）
-    console.log('🔍 查询历史菜单...');
-    const historyMenus = await query(
-      `SELECT id, title, menu_items_json
-       FROM menus
-       WHERE store_id = $1 AND is_active = TRUE AND source_type = 'uploaded'
-       ORDER BY created_at DESC
-       LIMIT 10`,
-      [storeId]
+    console.log(`✅ 实际取到专属菜库: ${storeDishes.rows.length}道`);
+  }
+  
+  // 从通用菜库随机取菜
+  if (commonTarget > 0) {
+    console.log(`🔍 从通用菜库随机取 ${commonTarget} 道菜...`);
+    const commonDishes = await query(
+      `SELECT id, dish_name, dish_type, ingredient_tags, knife_skill, 
+              cuisine, cook_method8, flavor, main_ingredients, sub_ingredients, seasons
+       FROM dishes_common
+       WHERE is_active = TRUE
+       ORDER BY RANDOM()
+       LIMIT $1`,
+      [commonTarget]
     );
     
-    console.log(`✅ 找到 ${historyMenus.rows.length} 份历史上传菜单`);
-    if (historyMenus.rows.length > 0) {
-      console.log('📋 历史菜单列表:');
-      historyMenus.rows.forEach((menu: any, idx: number) => {
-        console.log(`  ${idx + 1}. ${menu.title} (ID: ${menu.id})`);
-      });
-    }
-    
-    // 从历史菜单中提取所有菜品名称
-    const historyDishNames = new Set<string>();
-    historyMenus.rows.forEach((menu: any, menuIdx: number) => {
-      const menuData = menu.menu_items_json;
-      console.log(`📖 解析菜单 ${menuIdx + 1}: ${menu.title}`);
-      console.log(`   menu_items_json 类型: ${typeof menuData}`);
-      console.log(`   是否有days字段: ${menuData && 'days' in menuData}`);
-      
-      if (menuData && menuData.days && Array.isArray(menuData.days)) {
-        console.log(`   days数组长度: ${menuData.days.length}`);
-        menuData.days.forEach((day: any, dayIdx: number) => {
-          const dishes = day.lunch || [];
-          console.log(`   第${dayIdx + 1}天 (${day.day_label}) 菜品数: ${dishes.length}`);
-          dishes.forEach((dish: any, dishIdx: number) => {
-            // 兼容两种格式：字符串或对象
-            const dishName = typeof dish === 'string' ? dish : dish.dish_name;
-            if (dishName) {
-              historyDishNames.add(dishName);
-              if (dishIdx < 3) { // 只显示前3个作为示例
-                console.log(`     - ${dishName} (${typeof dish})`);
-              }
-            }
-          });
-        });
-      } else {
-        console.log(`   ⚠️  菜单数据格式不符合预期`);
-      }
-    });
-    
-    console.log(`\n✅ 从历史菜单中提取到 ${historyDishNames.size} 道不重复的菜品`);
-    if (historyDishNames.size > 0) {
-      const sampleDishes = Array.from(historyDishNames).slice(0, 10);
-      console.log(`📝 示例菜品（前10个）:`);
-      sampleDishes.forEach((name, idx) => {
-        console.log(`  ${idx + 1}. ${name}`);
-      });
-    }
-    
-    // 🔑 关键修复：优先使用dishes_store中已打好标签的菜品
-    console.log(`\n🏷️  标记历史菜品并使用已解析的标签...`);
-    
-    // 创建专属菜库的菜名Map，用于快速查找
-    const storeDishMap = new Map<string, any>();
-    storeDishes.rows.forEach((dish: any) => {
-      storeDishMap.set(dish.dish_name, dish);
-    });
-    console.log(`   专属菜库Map大小: ${storeDishMap.size}道`);
-    
-    // 标记专属菜库中的菜品为from_history
-    let fromStoreCount = 0;
-    storeDishes.rows.forEach((dish: any) => {
-      if (historyDishNames.has(dish.dish_name)) {
-        dish.from_history = true; // ✅ 标记为历史菜品
-        fromStoreCount++;
-      }
-    });
-    console.log(`   ✅ 专属菜库中有 ${fromStoreCount} 道菜在历史菜单中出现，已标记为历史菜品`);
-    
-    // 对于历史菜单中的菜，但不在专属菜库中的，才创建新对象
-    let newHistoryCount = 0;
-    historyDishNames.forEach((dishName) => {
-      if (!storeDishMap.has(dishName)) {
-        // ⚠️ 这道菜在历史菜单中，但dishes_store中没有（可能解析失败或跳过）
-        // 创建一个占位对象，稍后尝试从通用菜库匹配
-        allDishes.push({
-          id: null,
-          dish_name: dishName,
-          dish_type: null,
-          ingredient_tags: null,
-          knife_skill: null,
-          cuisine: null,
-          cook_method8: null,
-          flavor: null,
-          main_ingredients: null,
-          sub_ingredients: null,
-          seasons: null,
-          from_history: true,
-        });
-        newHistoryCount++;
-      }
-    });
-    
-    console.log(`   ⚠️  有 ${newHistoryCount} 道历史菜品不在专属菜库中（可能未解析），将尝试从通用菜库匹配`);
-    console.log(`📊 当前allDishes数组长度: ${allDishes.length}道`);
-    console.log(`📊 其中标记为from_history的: ${allDishes.filter(d => d.from_history === true).length}道`);
+    allDishes.push(...commonDishes.rows);
+    console.log(`✅ 实际取到通用菜库: ${commonDishes.rows.length}道`);
   }
   
-  // 从通用菜库获取所有菜品
-  console.log('查询通用菜库...');
-  const commonDishes = await query(
-    `SELECT id, dish_name, dish_type, ingredient_tags, knife_skill, 
-            cuisine, cook_method8, flavor, main_ingredients, sub_ingredients, seasons
-     FROM dishes_common
-     WHERE is_active = TRUE
-     ORDER BY RANDOM()`
-  );
+  // 随机打乱顺序，避免位置偏好
+  console.log(`\n🔀 混合并打乱菜品顺序...`);
+  allDishes.sort(() => Math.random() - 0.5);
   
-  // 为历史菜品补充完整信息（如果在通用菜库中能找到匹配的）
-  if (historyRatio > 0) {
-    console.log('\n🔗 尝试为历史菜品补充完整信息...');
-    const commonDishMap = new Map<string, any>();
-    commonDishes.rows.forEach((dish: any) => {
-      commonDishMap.set(dish.dish_name, dish);
-    });
-    console.log(`   通用菜库Map大小: ${commonDishMap.size}`);
-    
-    let matchedCount = 0;
-    let unmatchedDishes: string[] = [];
-    allDishes.forEach((dish: any) => {
-      if (dish.from_history && dish.dish_type === null) {
-        const matchedDish = commonDishMap.get(dish.dish_name);
-        if (matchedDish) {
-          // 用通用菜库的完整信息替换
-          Object.assign(dish, matchedDish);
-          dish.from_history = true; // 🔖 保留历史标记（关键！）
-          matchedCount++;
-        } else {
-          unmatchedDishes.push(dish.dish_name);
-        }
-      }
-    });
-    
-    console.log(`✅ 成功匹配 ${matchedCount} 道历史菜品的完整信息`);
-    if (unmatchedDishes.length > 0) {
-      console.log(`⚠️  未匹配到 ${unmatchedDishes.length} 道历史菜品（通用菜库中不存在）:`);
-      unmatchedDishes.slice(0, 5).forEach(name => {
-        console.log(`     - ${name}`);
-      });
-      if (unmatchedDishes.length > 5) {
-        console.log(`     ... 还有${unmatchedDishes.length - 5}道`);
-      }
-      
-      // 为未匹配的历史菜品推断菜品类型
-      console.log(`\n🤖 开始为未匹配的历史菜品推断类型...`);
-      let inferredCount = 0;
-      allDishes.forEach((dish: any) => {
-        if (dish.from_history && dish.dish_type === null) {
-          const inferredType = inferDishType(dish.dish_name);
-          if (inferredType) {
-            dish.dish_type = inferredType;
-            inferredCount++;
-          }
-        }
-      });
-      console.log(`✅ 成功推断 ${inferredCount} 道历史菜品的类型`);
-    }
-  }
+  console.log(`\n📊 ===== 最终菜品统计 =====`);
+  console.log(`总菜品数: ${allDishes.length}道`);
+  console.log(`历史菜品: ${allDishes.filter(d => d.from_history === true).length}道`);
+  console.log(`通用菜品: ${allDishes.filter(d => !d.from_history).length}道`);
   
-  allDishes.push(...commonDishes.rows);
-  console.log(`通用菜库: ${commonDishes.rows.length}道`);
-  console.log(`最终可用菜品总数: ${allDishes.length}道`);
-  
-  // 统计各类型菜品数量
+  // 按类型统计
   const typeCounts: Record<string, number> = {};
-  const historyTypeCounts: Record<string, number> = {};
-  const commonTypeCounts: Record<string, number> = {};
-  
   allDishes.forEach(dish => {
     if (dish.dish_type) {
       typeCounts[dish.dish_type] = (typeCounts[dish.dish_type] || 0) + 1;
-      
-      if (dish.from_history === true) {
-        historyTypeCounts[dish.dish_type] = (historyTypeCounts[dish.dish_type] || 0) + 1;
-      } else {
-        commonTypeCounts[dish.dish_type] = (commonTypeCounts[dish.dish_type] || 0) + 1;
-      }
     }
   });
-  
-  console.log('\n📊 ===== 最终菜品统计 =====');
-  console.log(`总菜品数: ${allDishes.length}道`);
-  
-  const historyDishes = allDishes.filter(d => d.from_history === true);
-  console.log(`🔴 历史菜品: ${historyDishes.length}道`);
-  console.log(`🔵 通用菜品: ${allDishes.filter(d => !d.from_history).length}道`);
-  
-  console.log('\n📊 菜品类型总分布:', typeCounts);
-  console.log('🔴 历史菜品类型分布:', historyTypeCounts);
-  console.log('🔵 通用菜品类型分布:', commonTypeCounts);
+  console.log('菜品类型分布:', typeCounts);
   console.log('============================\n');
   
   return allDishes;
@@ -685,17 +552,18 @@ function buildMenuGenerationPrompt(
   
   const dishesInfo = formatDishesForPrompt(dishes, request.used_history_ratio);
   
-  const historyRatioText = request.used_history_ratio > 0 
-    ? `\n【🔴 PRIMARY要求 - 历史菜占比】：
-这是最重要的约束！必须严格遵守！
-- 历史菜占比：${(request.used_history_ratio * 100).toFixed(0)}%
-- 每天必须包含 ${historyDishesPerDay} 道历史菜品（标记为【历史】）
-- 每天必须包含 ${commonDishesPerDay} 道通用菜品（标记为【通用】）
-- 历史菜品数量：${historyDishes.length} 道
-- 通用菜品数量：${commonDishes.length} 道
-
-‼️ 强制要求：严格按照上述比例从【历史】和【通用】菜品中选择，不得偏离！`
-    : '\n【历史菜占比】：0%，全部使用通用菜品';
+  // 🔴 临时注释：测试不限制历史菜占比的效果
+  const historyRatioText = ''; // request.used_history_ratio > 0 
+    // ? `\n【🔴 PRIMARY要求 - 历史菜占比】：
+// 这是最重要的约束！必须严格遵守！
+// - 历史菜占比：${(request.used_history_ratio * 100).toFixed(0)}%
+// - 每天必须包含 ${historyDishesPerDay} 道历史菜品（标记为【历史】）
+// - 每天必须包含 ${commonDishesPerDay} 道通用菜品（标记为【通用】）
+// - 历史菜品数量：${historyDishes.length} 道
+// - 通用菜品数量：${commonDishes.length} 道
+// 
+// ‼️ 强制要求：严格按照上述比例从【历史】和【通用】菜品中选择，不得偏离！`
+    // : '\n【历史菜占比】：0%，全部使用通用菜品';
   
   const userPrompt = `请从以下【菜品来源】中选取菜品，为团餐食堂生成一周五天的午餐菜谱。
 ${historyRatioText}
@@ -745,82 +613,54 @@ function getFlavorRequirement(required: boolean): string {
  * 为避免Prompt过长，限制每种类型最多传递50道菜
  */
 function formatDishesForPrompt(dishes: any[], historyRatio: number): string {
-  // 按菜品类型和来源分组
-  const grouped: Record<string, { history: any[], common: any[] }> = {
-    '热菜主荤': { history: [], common: [] },
-    '热菜半荤': { history: [], common: [] },
-    '热菜素菜': { history: [], common: [] },
-    '凉菜': { history: [], common: [] }
+  // 按菜品类型分组（不再区分历史/通用）
+  const grouped: Record<string, any[]> = {
+    '热菜主荤': [],
+    '热菜半荤': [],
+    '热菜素菜': [],
+    '凉菜': []
   };
   
+  // 直接按类型分组，不区分来源
   dishes.forEach(dish => {
     if (grouped[dish.dish_type]) {
-      if (dish.from_history === true) {
-        grouped[dish.dish_type].history.push(dish);
-      } else {
-        grouped[dish.dish_type].common.push(dish);
-      }
+      grouped[dish.dish_type].push(dish);
     }
   });
   
   let result = '';
-  const maxPerType = 50; // 每种类型最多50道菜，避免Prompt过长
+  const maxPerType = 100; // 增加到100道，因为不再分组
   
-  for (const [type, { history, common }] of Object.entries(grouped)) {
-    if (history.length === 0 && common.length === 0) continue;
+  for (const [type, dishList] of Object.entries(grouped)) {
+    if (dishList.length === 0) continue;
     
-    result += `\n【${type}】：\n`;
+    result += `\n【${type}】（共${dishList.length}道可选）：\n`;
     
-    // 如果有历史菜品，优先列出
-    if (historyRatio > 0 && history.length > 0) {
-      const limitedHistory = history.slice(0, maxPerType);
-      result += `  🔴 【历史】菜品（共${limitedHistory.length}道，必须优先从此处选择以满足${(historyRatio * 100).toFixed(0)}%占比）：\n`;
-      limitedHistory.forEach((dish, idx) => {
-        const tags = [
-          dish.cook_method8 ? dish.cook_method8 : null,
-          dish.ingredient_tags && dish.ingredient_tags.length > 0 ? dish.ingredient_tags.join(',') : null,
-          dish.knife_skill ? dish.knife_skill : null
-        ].filter(Boolean).join('·');
-        
-        result += `    ${idx + 1}. ${dish.dish_name}`;
-        if (tags) {
-          result += `（${tags}）`;
-        }
-        result += '\n';
-      });
+    // 随机打乱顺序，避免位置偏好
+    const shuffled = [...dishList].sort(() => Math.random() - 0.5);
+    const limited = shuffled.slice(0, maxPerType);
+    
+    limited.forEach((dish, idx) => {
+      const tags = [
+        dish.cook_method8 ? dish.cook_method8 : null,
+        dish.ingredient_tags && dish.ingredient_tags.length > 0 ? dish.ingredient_tags.join(',') : null,
+        dish.knife_skill ? dish.knife_skill : null
+      ].filter(Boolean).join('·');
       
-      if (history.length > maxPerType) {
-        result += `    ... （还有${history.length - maxPerType}道历史${type}）\n`;
+      result += `  ${idx + 1}. ${dish.dish_name}`;
+      if (tags) {
+        result += `（${tags}）`;
       }
-    }
+      result += '\n';
+    });
     
-    // 列出通用菜品
-    if (common.length > 0) {
-      const limitedCommon = common.slice(0, maxPerType);
-      result += `  🔵 【通用】菜品（共${limitedCommon.length}道）：\n`;
-      limitedCommon.forEach((dish, idx) => {
-        const tags = [
-          dish.cook_method8 ? dish.cook_method8 : null,
-          dish.ingredient_tags && dish.ingredient_tags.length > 0 ? dish.ingredient_tags.join(',') : null,
-          dish.knife_skill ? dish.knife_skill : null
-        ].filter(Boolean).join('·');
-        
-        result += `    ${idx + 1}. ${dish.dish_name}`;
-        if (tags) {
-          result += `（${tags}）`;
-        }
-        result += '\n';
-      });
-      
-      if (common.length > maxPerType) {
-        result += `    ... （还有${common.length - maxPerType}道通用${type}）\n`;
-      }
+    if (dishList.length > maxPerType) {
+      result += `  ... （还有${dishList.length - maxPerType}道${type}）\n`;
     }
   }
   
   console.log(`📝 格式化后菜品信息长度: ${result.length}字符`);
-  console.log(`📊 历史菜品总数: ${dishes.filter(d => d.from_history === true).length}道`);
-  console.log(`📊 通用菜品总数: ${dishes.filter(d => !d.from_history).length}道`);
+  console.log(`📊 总菜品数: ${dishes.length}道`);
   
   return result;
 }
@@ -883,15 +723,13 @@ async function matchDishIds(
       const dishDescription = typeof dish === 'object' ? dish.description : '';
       const dishCookingMethod = typeof dish === 'object' ? dish.cookingMethod : '';
       
-      // 检查该菜品是否来自历史菜单
-      const originalDish = dishNameMap.get(dishName);
-      const isFromHistory = originalDish?.from_history === true;
-      
       // 先查专属菜库
       let dishResult = await query(
         'SELECT id, dish_type, ingredient_tags, cook_method8, knife_skill, flavor, cuisine FROM dishes_store WHERE store_id = $1 AND dish_name = $2 AND is_active = TRUE',
         [storeId, dishName]
       );
+      
+      let isFromStore = dishResult.rows.length > 0;
       
       // 再查通用菜库
       if (dishResult.rows.length === 0) {
@@ -902,6 +740,9 @@ async function matchDishIds(
       }
       
       const dishData = dishResult.rows.length > 0 ? dishResult.rows[0] : null;
+      
+      // 🔑 关键修改：根据实际查询结果判断来源（专属菜库=历史，通用菜库=非历史）
+      const isFromHistory = isFromStore;
       
       // 生成默认描述（如果AI没提供）
       let finalDescription = dishDescription;

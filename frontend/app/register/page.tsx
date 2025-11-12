@@ -49,13 +49,13 @@ export default function RegisterPage() {
         password: data.password,
         confirm_password: data.confirmPassword,
         storeName: data.storeName,
-        contact_person: data.contactPerson,
-        contact_phone: data.contactPhone,
+        contactPerson: data.contactPerson,
+        contactPhone: data.contactPhone,
         address: data.address,
         defaultConfig: {
           lunch: {
-            hot_dish: 18,
-            cold_dish: 4,
+            hotDish: 18,
+            coldDish: 4,
           },
         },
       });

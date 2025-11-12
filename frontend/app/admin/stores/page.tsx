@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Search, Filter, Edit, Trash2, Power, PowerOff, Download, Upload, Settings } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, Power, PowerOff, Download, Upload, Settings, Check, X } from 'lucide-react';
 import StoreDialog from './components/StoreDialog';
 import ConfigDialog from './components/ConfigDialog';
 
@@ -377,16 +377,21 @@ export default function AdminStoresPage() {
                           {store.username}
                         </td>
                         <td style={{ padding: '16px', textAlign: 'center' }}>
-                          <span style={{
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '14px',
-                            fontWeight: '400',
+                          <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
                             background: store.is_active ? '#E8F5E9' : '#FFEBEE',
-                            color: store.is_active ? '#2E7D32' : '#C62828'
                           }}>
-                            {store.is_active ? '已启用' : '已禁用'}
-                          </span>
+                            {store.is_active ? (
+                              <Check size={20} color="#2E7D32" strokeWidth={3} />
+                            ) : (
+                              <X size={20} color="#C62828" strokeWidth={3} />
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: '16px', textAlign: 'center', fontSize: '16px', fontWeight: '400', color: '#666' }}>
                           {store.generated_count || 0}

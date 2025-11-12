@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Eye, Trash2, RefreshCw, Download, ChevronDown } from 'lucide-react';
 import { exportToCSV, exportToExcel, formatDishesForExport } from '@/lib/exportUtils';
+import { BulkUploadDishDialog } from '@/components/BulkUploadDishDialog';
+import { AddDishDialog } from '@/components/AddDishDialog';
+import { FloatingActionButton } from '@/components/FloatingActionButton';
+import { BulkActionToolbar } from '@/components/BulkActionToolbar';
 
 interface Dish {
   id: string;
@@ -52,10 +55,18 @@ export default function DishesPage() {
   const [selectedSeason, setSelectedSeason] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [showAddDish, setShowAddDish] = useState(false);
+  
+  // 批量选择状态
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     fetchStores();
     fetchDishes();
+    // 切换数据源时清除选择
+    handleClearSelection();
   }, [page, search, selectedStore, selectedDishType, selectedCookMethod, selectedSeason, dishSource]);
 
   const fetchStores = async () => {
@@ -112,7 +123,7 @@ export default function DishesPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/dishes/${id}`, {
+      const response = await fetch(`http://localhost:8080/api/admin/dishes/${id}?source=${dishSource}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -127,7 +138,59 @@ export default function DishesPage() {
   };
 
   const handleViewDetail = (id: string) => {
-    router.push(`/admin/dishes/${id}`);
+    router.push(`/admin/dishes/${id}?source=${dishSource}`);
+  };
+
+  // 批量选择相关函数
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(dishes.map(d => d.id));
+      setSelectedIds(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+    setSelectAll(newSelected.size === dishes.length && dishes.length > 0);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectAll(false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmMsg = `确定要删除选中的 ${selectedIds.size} 个菜品吗？此操作为软删除。`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const token = localStorage.getItem('admin_token');
+      const deletePromises = Array.from(selectedIds).map(id =>
+        fetch(`http://localhost:8080/api/admin/dishes/${id}?source=${dishSource}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+      );
+
+      await Promise.all(deletePromises);
+      alert(`成功删除 ${selectedIds.size} 个菜品！`);
+      handleClearSelection();
+      fetchDishes();
+    } catch (error: any) {
+      alert(error.message || '批量删除失败');
+    }
   };
 
   const handleReset = () => {
@@ -177,21 +240,15 @@ export default function DishesPage() {
   return (
     <div style={{ padding: '48px' }}>
       {/* 标题 */}
-      <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{
-            fontSize: '32px',
-            fontWeight: '400',
-            color: '#2C2C2C',
-            letterSpacing: '1px',
-            marginBottom: '8px'
-          }}>
-            菜品库管理
-          </h1>
-          <p style={{ fontSize: '14px', color: '#999' }}>
-            {dishSource === 'common' ? '通用菜库' : '门店专属菜库'}（共 {total} 道菜）
-          </p>
-        </div>
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{
+          fontSize: '32px',
+          fontWeight: '400',
+          color: '#2C2C2C',
+          letterSpacing: '1px',
+        }}>
+          菜品库管理
+        </h1>
 
         {/* 导出按钮 */}
         <div style={{ position: 'relative' }}>
@@ -271,42 +328,126 @@ export default function DishesPage() {
         </div>
       </div>
 
-      {/* Tab切换：通用菜库 vs 食堂专属菜库 */}
-      <div style={{ marginBottom: '24px' }}>
-        <Tabs value={dishSource} onValueChange={(value) => {
-          setDishSource(value as 'common' | 'store');
-          setPage(1); // 切换时重置页码
-        }}>
-          <TabsList style={{
-            background: '#F5F5F0',
-            border: '1px solid #E8E8E3',
-            padding: '4px',
-            borderRadius: '8px'
+      {/* 菜库切换卡片 - 重新设计 */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: '1fr 1fr', 
+        gap: '20px',
+        marginBottom: '32px'
+      }}>
+        {/* 通用菜库卡片 */}
+        <button
+          onClick={() => {
+            setDishSource('common');
+            setPage(1);
+          }}
+          style={{
+            background: dishSource === 'common' ? '#2C2C2C' : '#FFFFFF',
+            border: `2px solid ${dishSource === 'common' ? '#2C2C2C' : '#E8E8E3'}`,
+            borderRadius: '12px',
+            padding: '20px 24px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: dishSource === 'common' 
+              ? '0 8px 24px rgba(44, 44, 44, 0.15)' 
+              : '0 2px 8px rgba(0, 0, 0, 0.05)',
+            transform: dishSource === 'common' ? 'translateY(-2px)' : 'none',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => {
+            if (dishSource !== 'common') {
+              e.currentTarget.style.borderColor = '#999';
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (dishSource !== 'common') {
+              e.currentTarget.style.borderColor = '#E8E8E3';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)';
+            }
+          }}
+        >
+          <div style={{
+            fontSize: '20px',
+            fontWeight: '400',
+            color: dishSource === 'common' ? '#FFFFFF' : '#2C2C2C',
+            letterSpacing: '0.5px',
+            marginBottom: '8px'
           }}>
-            <TabsTrigger
-              value="common"
-              style={{
-                padding: '8px 24px',
-                fontSize: '14px',
-                fontWeight: '400',
-                letterSpacing: '0.5px',
-              }}
-            >
-              通用菜库 🍽️
-            </TabsTrigger>
-            <TabsTrigger
-              value="store"
-              style={{
-                padding: '8px 24px',
-                fontSize: '14px',
-                fontWeight: '400',
-                letterSpacing: '0.5px',
-              }}
-            >
-              门店专属菜库 🏪
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+            通用菜库
+          </div>
+          <div style={{
+            fontSize: '28px',
+            fontWeight: '300',
+            color: dishSource === 'common' ? '#FFFFFF' : '#666',
+          }}>
+            {dishSource === 'common' ? total.toLocaleString() : '—'}
+            <span style={{ 
+              fontSize: '14px', 
+              marginLeft: '6px',
+              opacity: 0.8
+            }}>
+              道菜
+            </span>
+          </div>
+        </button>
+
+        {/* 门店专属菜库卡片 */}
+        <button
+          onClick={() => {
+            setDishSource('store');
+            setPage(1);
+          }}
+          style={{
+            background: dishSource === 'store' ? '#2C2C2C' : '#FFFFFF',
+            border: `2px solid ${dishSource === 'store' ? '#2C2C2C' : '#E8E8E3'}`,
+            borderRadius: '12px',
+            padding: '20px 24px',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: dishSource === 'store' 
+              ? '0 8px 24px rgba(44, 44, 44, 0.15)' 
+              : '0 2px 8px rgba(0, 0, 0, 0.05)',
+            transform: dishSource === 'store' ? 'translateY(-2px)' : 'none',
+            textAlign: 'left',
+          }}
+          onMouseEnter={(e) => {
+            if (dishSource !== 'store') {
+              e.currentTarget.style.borderColor = '#999';
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (dishSource !== 'store') {
+              e.currentTarget.style.borderColor = '#E8E8E3';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)';
+            }
+          }}
+        >
+          <div style={{
+            fontSize: '20px',
+            fontWeight: '400',
+            color: dishSource === 'store' ? '#FFFFFF' : '#2C2C2C',
+            letterSpacing: '0.5px',
+            marginBottom: '8px'
+          }}>
+            门店专属菜库
+          </div>
+          <div style={{
+            fontSize: '28px',
+            fontWeight: '300',
+            color: dishSource === 'store' ? '#FFFFFF' : '#666',
+          }}>
+            {dishSource === 'store' ? total.toLocaleString() : '—'}
+            <span style={{ 
+              fontSize: '14px', 
+              marginLeft: '6px',
+              opacity: 0.8
+            }}>
+              道菜
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* 搜索和筛选 */}
@@ -498,6 +639,15 @@ export default function DishesPage() {
         </CardContent>
       </Card>
 
+      {/* 批量操作工具栏 */}
+      <BulkActionToolbar
+        selectedCount={selectedIds.size}
+        totalCount={dishes.length}
+        onSelectAll={handleSelectAll}
+        onClearSelection={handleClearSelection}
+        onDelete={handleBulkDelete}
+      />
+
       {/* 菜品列表 */}
       {loading ? (
         <div style={{ padding: '48px', textAlign: 'center', color: '#999' }}>
@@ -516,13 +666,32 @@ export default function DishesPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#FAFAFA', borderBottom: '1px solid #E8E8E3' }}>
+                    {/* Checkbox列 */}
+                    <th style={{ padding: '16px', width: '48px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectAll}
+                          onChange={handleSelectAll}
+                          style={{
+                            width: '18px',
+                            height: '18px',
+                            cursor: 'pointer',
+                            accentColor: '#2C2C2C',
+                            margin: 0,
+                          }}
+                        />
+                      </div>
+                    </th>
                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '400', color: '#666' }}>
                       菜品名称
                     </th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '400', color: '#666' }}>
-                      门店
-                    </th>
-                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '400', color: '#666' }}>
+                    {dishSource === 'store' && (
+                      <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '400', color: '#666' }}>
+                        门店
+                      </th>
+                    )}
+                    <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '400', color: '#666', minWidth: '120px' }}>
                       类型
                     </th>
                     <th style={{ padding: '16px', textAlign: 'left', fontSize: '14px', fontWeight: '400', color: '#666' }}>
@@ -549,40 +718,68 @@ export default function DishesPage() {
                       style={{
                         borderBottom: '1px solid #E8E8E3',
                         transition: 'background 0.2s',
+                        background: selectedIds.has(dish.id) ? '#F0F9FF' : 'transparent',
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#FAFAFA')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      onMouseEnter={(e) => {
+                        if (!selectedIds.has(dish.id)) {
+                          e.currentTarget.style.background = '#FAFAFA';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = selectedIds.has(dish.id) ? '#F0F9FF' : 'transparent';
+                      }}
                     >
-                      <td style={{ padding: '16px', fontSize: '15px', color: '#2C2C2C', fontWeight: '400' }}>
+                      {/* Checkbox列 */}
+                      <td style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(dish.id)}
+                            onChange={() => handleSelectOne(dish.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              width: '18px',
+                              height: '18px',
+                              cursor: 'pointer',
+                              accentColor: '#2C2C2C',
+                              margin: 0,
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td style={{ padding: '16px', fontSize: '15px', color: '#2C2C2C', fontWeight: '400', verticalAlign: 'middle' }}>
                         {dish.dish_name}
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>
-                        {dish.store_name}
-                      </td>
-                      <td style={{ padding: '16px' }}>
+                      {dishSource === 'store' && (
+                        <td style={{ padding: '16px', fontSize: '14px', color: '#666', verticalAlign: 'middle' }}>
+                          {dish.store_name}
+                        </td>
+                      )}
+                      <td style={{ padding: '16px', verticalAlign: 'middle' }}>
                         <span style={{
                           padding: '4px 12px',
                           borderRadius: '12px',
                           fontSize: '13px',
                           background: '#F0F0F0',
                           color: '#666',
+                          whiteSpace: 'nowrap',
                         }}>
                           {dish.dish_type}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>
+                      <td style={{ padding: '16px', fontSize: '14px', color: '#666', verticalAlign: 'middle' }}>
                         {dish.cook_method8}
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>
+                      <td style={{ padding: '16px', fontSize: '14px', color: '#666', verticalAlign: 'middle' }}>
                         {dish.flavor || '-'}
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px', color: '#666' }}>
+                      <td style={{ padding: '16px', fontSize: '14px', color: '#666', verticalAlign: 'middle' }}>
                         {dish.seasons && dish.seasons.length > 0 ? dish.seasons.join('、') : '-'}
                       </td>
-                      <td style={{ padding: '16px', fontSize: '14px', color: '#999' }}>
+                      <td style={{ padding: '16px', fontSize: '14px', color: '#999', verticalAlign: 'middle' }}>
                         {formatDate(dish.created_at)}
                       </td>
-                      <td style={{ padding: '16px' }}>
+                      <td style={{ padding: '16px', verticalAlign: 'middle' }}>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
                           <button
                             onClick={() => handleViewDetail(dish.id)}
@@ -672,6 +869,30 @@ export default function DishesPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* 悬浮操作按钮（仅通用菜库显示） */}
+      {dishSource === 'common' && (
+        <FloatingActionButton
+          onNewDish={() => setShowAddDish(true)}
+          onBulkUpload={() => setShowBulkUpload(true)}
+        />
+      )}
+
+      {/* 批量上传对话框 */}
+      {showBulkUpload && (
+        <BulkUploadDishDialog
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={() => fetchDishes()}
+        />
+      )}
+
+      {/* 单个添加对话框 */}
+      {showAddDish && (
+        <AddDishDialog
+          onClose={() => setShowAddDish(false)}
+          onSuccess={() => fetchDishes()}
+        />
       )}
     </div>
   );

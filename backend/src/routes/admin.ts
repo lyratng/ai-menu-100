@@ -882,13 +882,23 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   fastify.get('/dishes/:id', { preHandler: authenticateAdmin }, async (request, reply) => {
     try {
       const { id } = request.params as any;
+      const { source = 'store' } = request.query as any; // 默认查询门店菜库
+
+      // 根据source决定查询哪个表
+      const tableName = source === 'common' ? 'dishes_common' : 'dishes_store';
+      const needsStoreJoin = source === 'store'; // 只有查询store表时才需要JOIN
+
+      // 构建查询SQL
+      const selectFields = `
+        d.*,
+        ${needsStoreJoin ? 's.name as store_name' : 'NULL as store_name'}
+      `;
+      const joinClause = needsStoreJoin ? 'LEFT JOIN stores s ON d.store_id = s.id' : '';
 
       const result = await pool.query(
-        `SELECT 
-          d.*,
-          s.name as store_name
-         FROM dishes_store d
-         LEFT JOIN stores s ON d.store_id = s.id
+        `SELECT ${selectFields}
+         FROM ${tableName} d
+         ${joinClause}
          WHERE d.id = $1`,
         [id]
       );
@@ -908,9 +918,13 @@ export default async function adminRoutes(fastify: FastifyInstance) {
   fastify.delete('/dishes/:id', { preHandler: authenticateAdmin }, async (request, reply) => {
     try {
       const { id } = request.params as any;
+      const { source = 'store' } = request.query as any; // 默认删除门店菜库
+
+      // 根据source决定操作哪个表
+      const tableName = source === 'common' ? 'dishes_common' : 'dishes_store';
 
       await pool.query(
-        `UPDATE dishes_store SET is_active = false WHERE id = $1`,
+        `UPDATE ${tableName} SET is_active = false WHERE id = $1`,
         [id]
       );
 
@@ -918,6 +932,298 @@ export default async function adminRoutes(fastify: FastifyInstance) {
     } catch (error: any) {
       fastify.log.error(error);
       return reply.status(500).send({ message: '删除菜品失败' });
+    }
+  });
+
+  // ==================== 通用菜库管理 ====================
+
+  // 批量上传通用菜品（Excel导入）
+  fastify.post('/dishes/common/bulk-upload', { preHandler: authenticateAdmin }, async (request, reply) => {
+    try {
+      const { dishes, duplicateStrategy = 'skip' } = request.body as any;
+      // dishes: 解析后的菜品数组
+      // duplicateStrategy: 'skip' | 'overwrite'
+
+      if (!dishes || !Array.isArray(dishes) || dishes.length === 0) {
+        return reply.status(400).send({ message: '请提供有效的菜品数据' });
+      }
+
+      const results = {
+        total: dishes.length,
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        errors: [] as any[],
+      };
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        for (let i = 0; i < dishes.length; i++) {
+          const dish = dishes[i];
+          const rowIndex = i + 2; // Excel行号（第1行是标题）
+
+          try {
+            // 为每个菜品创建保存点
+            await client.query(`SAVEPOINT dish_${i}`);
+
+            // 验证必填字段
+            if (!dish.dish_name || !dish.dish_type || !dish.cook_method8) {
+              results.failed++;
+              results.errors.push({
+                row: rowIndex,
+                dish_name: dish.dish_name || '未知',
+                error: '缺少必填字段：菜品名称、菜品类型、烹饪方式',
+              });
+              await client.query(`ROLLBACK TO SAVEPOINT dish_${i}`);
+              continue;
+            }
+
+            // 检查是否存在重复菜品（包括软删除的）
+            const existingResult = await client.query(
+              `SELECT id, is_active FROM dishes_common WHERE dish_name = $1`,
+              [dish.dish_name]
+            );
+
+            if (existingResult.rows.length > 0) {
+              const existingDish = existingResult.rows[0];
+              
+              if (duplicateStrategy === 'skip') {
+                results.skipped++;
+                results.errors.push({
+                  row: rowIndex,
+                  dish_name: dish.dish_name,
+                  error: existingDish.is_active ? '菜品已存在（已跳过）' : '菜品已存在但已删除（已跳过）',
+                });
+                await client.query(`RELEASE SAVEPOINT dish_${i}`);
+                continue;
+              } else if (duplicateStrategy === 'overwrite') {
+                // 更新现有菜品（如果是软删除的，同时恢复）
+                await client.query(
+                  `UPDATE dishes_common SET
+                    dish_type = $1,
+                    ingredient_tags = $2,
+                    knife_skill = $3,
+                    cuisine = $4,
+                    cook_method8 = $5,
+                    flavor = $6,
+                    main_ingredients = $7,
+                    sub_ingredients = $8,
+                    seasons = $9,
+                    analysis = $10,
+                    is_active = true,
+                    updated_at = NOW()
+                   WHERE dish_name = $11`,
+                  [
+                    dish.dish_type,
+                    dish.ingredient_tags || [],
+                    dish.knife_skill || null,
+                    dish.cuisine || null,
+                    dish.cook_method8,
+                    dish.flavor || null,
+                    dish.main_ingredients || [],
+                    dish.sub_ingredients || [],
+                    dish.seasons || [],
+                    JSON.stringify({
+                      auto_parsed: false,
+                      confidence: 1.0,
+                      status: 'human_verified',
+                    }),
+                    dish.dish_name,
+                  ]
+                );
+                results.success++;
+                await client.query(`RELEASE SAVEPOINT dish_${i}`);
+                continue;
+              }
+            }
+
+            // 插入新菜品
+            await client.query(
+              `INSERT INTO dishes_common (
+                dish_name,
+                dish_type,
+                ingredient_tags,
+                knife_skill,
+                cuisine,
+                cook_method8,
+                flavor,
+                main_ingredients,
+                sub_ingredients,
+                seasons,
+                analysis
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+              [
+                dish.dish_name,
+                dish.dish_type,
+                dish.ingredient_tags || [],
+                dish.knife_skill || null,
+                dish.cuisine || null,
+                dish.cook_method8,
+                dish.flavor || null,
+                dish.main_ingredients || [],
+                dish.sub_ingredients || [],
+                dish.seasons || [],
+                JSON.stringify({
+                  auto_parsed: false,
+                  confidence: 1.0,
+                  status: 'human_verified',
+                }),
+              ]
+            );
+            results.success++;
+            await client.query(`RELEASE SAVEPOINT dish_${i}`);
+          } catch (error: any) {
+            // 回滚到保存点，不影响其他菜品
+            await client.query(`ROLLBACK TO SAVEPOINT dish_${i}`);
+            results.failed++;
+            results.errors.push({
+              row: rowIndex,
+              dish_name: dish.dish_name || '未知',
+              error: error.message || '插入失败',
+            });
+          }
+        }
+
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+
+      return reply.send({
+        message: '导入完成',
+        results,
+      });
+    } catch (error: any) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: '批量上传失败' });
+    }
+  });
+
+  // 单个添加通用菜品
+  fastify.post('/dishes/common', { preHandler: authenticateAdmin }, async (request, reply) => {
+    try {
+      const dish = request.body as any;
+
+      // 验证必填字段
+      if (!dish.dish_name || !dish.dish_type || !dish.cook_method8) {
+        return reply.status(400).send({ message: '缺少必填字段：菜品名称、菜品类型、烹饪方式' });
+      }
+
+      // 检查是否存在重复菜品
+      const existingResult = await pool.query(
+        `SELECT id FROM dishes_common WHERE dish_name = $1 AND is_active = true`,
+        [dish.dish_name]
+      );
+
+      if (existingResult.rows.length > 0) {
+        return reply.status(400).send({ message: '该菜品已存在于通用菜库' });
+      }
+
+      // 插入新菜品
+      const result = await pool.query(
+        `INSERT INTO dishes_common (
+          dish_name,
+          dish_type,
+          ingredient_tags,
+          knife_skill,
+          cuisine,
+          cook_method8,
+          flavor,
+          main_ingredients,
+          sub_ingredients,
+          seasons,
+          analysis
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *`,
+        [
+          dish.dish_name,
+          dish.dish_type,
+          dish.ingredient_tags || [],
+          dish.knife_skill || null,
+          dish.cuisine || null,
+          dish.cook_method8,
+          dish.flavor || null,
+          dish.main_ingredients || [],
+          dish.sub_ingredients || [],
+          dish.seasons || [],
+          JSON.stringify({
+            auto_parsed: false,
+            confidence: 1.0,
+            status: 'human_verified',
+          }),
+        ]
+      );
+
+      return reply.send({
+        message: '添加成功',
+        dish: result.rows[0],
+      });
+    } catch (error: any) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: '添加菜品失败' });
+    }
+  });
+
+  // 下载通用菜品Excel模板
+  fastify.get('/dishes/common/template', { preHandler: authenticateAdmin }, async (request, reply) => {
+    try {
+      // 返回模板的列定义和示例数据
+      const template = {
+        columns: [
+          { key: 'dish_name', label: '菜品名称*', required: true },
+          { key: 'dish_type', label: '菜品类型*', required: true, options: ['热菜主荤', '热菜半荤', '热菜素菜', '凉菜', '主食', '风味小吃', '汤', '酱汁', '饮料', '手工'] },
+          { key: 'cook_method8', label: '烹饪方式*', required: true, options: ['炒', '熘', '蒸', '烧', '烤', '炖', '煎', '烹'] },
+          { key: 'ingredient_tags', label: '食材特征', required: false, note: '多个用逗号分隔，如：禽,蔬', options: ['肉', '禽', '鱼', '蛋', '豆', '菌', '筋', '蔬'] },
+          { key: 'knife_skill', label: '刀工', required: false, options: ['片', '丁', '粒', '米', '末', '茸', '丝', '条', '段', '块', '球', '花刀'] },
+          { key: 'cuisine', label: '菜系', required: false, note: '如：川菜、粤菜、鲁菜等' },
+          { key: 'flavor', label: '口味', required: false, note: '如：辣、酸甜、清淡等' },
+          { key: 'main_ingredients', label: '主料', required: false, note: '多个用逗号分隔，如：鸡胸肉,花生' },
+          { key: 'sub_ingredients', label: '辅料', required: false, note: '多个用逗号分隔，如：青椒,干辣椒' },
+          { key: 'seasons', label: '季节', required: false, note: '多个用逗号分隔，如：春,夏,秋,冬', options: ['春', '夏', '秋', '冬'] },
+        ],
+        exampleData: [
+          {
+            '菜品名称*': '宫保鸡丁',
+            '菜品类型*': '热菜主荤',
+            '烹饪方式*': '炒',
+            '热菜食材特征': '禽,蔬',
+            '刀工': '丁',
+            '菜系': '川菜',
+            '口味': '辣',
+            '主料': '鸡胸肉,花生',
+            '辅料': '青椒,干辣椒,葱,姜,蒜',
+            '是否春季菜': '是',
+            '是否夏季菜': '是',
+            '是否秋季菜': '是',
+            '是否冬季菜': '是',
+          },
+          {
+            '菜品名称*': '清蒸鲈鱼',
+            '菜品类型*': '热菜主荤',
+            '烹饪方式*': '蒸',
+            '热菜食材特征': '鱼',
+            '刀工': '',
+            '菜系': '粤菜',
+            '口味': '清淡',
+            '主料': '鲈鱼',
+            '辅料': '姜,葱,料酒',
+            '是否春季菜': '是',
+            '是否夏季菜': '是',
+            '是否秋季菜': '否',
+            '是否冬季菜': '否',
+          },
+        ],
+      };
+
+      return reply.send(template);
+    } catch (error: any) {
+      fastify.log.error(error);
+      return reply.status(500).send({ message: '获取模板失败' });
     }
   });
 }

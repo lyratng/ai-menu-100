@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import ParseStatusBar from '@/components/ParseStatusBar';
+import MenuUploadDialog from '@/components/MenuUploadDialog';
 
 interface Menu {
   id: string;
@@ -36,6 +37,7 @@ export default function HistoryPage() {
   const [showMenuDetail, setShowMenuDetail] = useState(false);
   const [selectedDish, setSelectedDish] = useState<any>(null);
   const [showDishDetail, setShowDishDetail] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
 
   useEffect(() => {
     // 检查登录状态
@@ -129,12 +131,19 @@ export default function HistoryPage() {
 
   const handleUploadMore = () => {
     if (uploadedMenus.length >= 50) {
-      alert('菜单数量已达上限，请清除一部分菜单');
+      alert('菜单数量已达上限（50份），请先删除一些菜单');
       return;
     }
     
-    // TODO: 打开文件选择对话框
-    alert('上传功能开发中');
+    setShowUploadDialog(true);
+  };
+
+  const handleUploadSuccess = () => {
+    // 上传成功后刷新列表
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchUploadedMenus(token);
+    }
   };
 
   const handleViewMenu = (menu: Menu) => {
@@ -686,6 +695,19 @@ export default function HistoryPage() {
           </div>
         );
       })()}
+
+      {/* 上传对话框 */}
+      {user && (
+        <MenuUploadDialog
+          open={showUploadDialog}
+          onClose={() => setShowUploadDialog(false)}
+          onUploadSuccess={handleUploadSuccess}
+          maxFiles={50}
+          currentCount={uploadedMenus.length}
+          storeId={user.storeId || user.store_id}
+          mealType="lunch"
+        />
+      )}
 
       {/* 菜品详情弹窗 */}
       {showDishDetail && selectedDish && (

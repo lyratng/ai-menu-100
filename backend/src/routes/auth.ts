@@ -10,6 +10,9 @@ const registerSchema = z.object({
   password: z.string().min(6).max(100),
   confirm_password: z.string(),
   storeName: z.string().min(1).max(100),
+  contactPerson: z.string().min(1).max(100).optional(),
+  contactPhone: z.string().optional(),
+  address: z.string().optional(),
   defaultConfig: z.object({
     breakfast: z.object({
       coldDish: z.number().int().min(0).max(50).optional(),
@@ -89,10 +92,10 @@ export default async function authRoutes(fastify: FastifyInstance) {
         
         // 创建门店
         const storeResult = await client.query(
-          `INSERT INTO stores (name, default_config, is_active, created_at, updated_at)
-           VALUES ($1, $2, TRUE, NOW(), NOW())
+          `INSERT INTO stores (name, contact_person, contact_phone, address, default_config, is_active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW())
            RETURNING id, name`,
-          [body.storeName, body.defaultConfig]
+          [body.storeName, body.contactPerson, body.contactPhone, body.address, body.defaultConfig]
         );
         
         const store = storeResult.rows[0];
