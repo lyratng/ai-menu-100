@@ -69,7 +69,7 @@ export default function HistoryPage() {
 
   const fetchGeneratedMenus = async (token: string) => {
     try {
-      const response = await fetch('${API_URL}/api/menu/history?source_type=generated&limit=10', {
+      const response = await fetch(`${API_URL}/api/menu/history?source_type=generated&limit=10`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -86,7 +86,7 @@ export default function HistoryPage() {
 
   const fetchUploadedMenus = async (token: string) => {
     try {
-      const response = await fetch('${API_URL}/api/menu/history?source_type=uploaded&limit=50', {
+      const response = await fetch(`${API_URL}/api/menu/history?source_type=uploaded&limit=50`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
