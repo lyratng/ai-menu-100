@@ -81,7 +81,7 @@ export default function SettingsPage() {
     }
 
     // 获取用户信息和默认配置
-    fetch('${API_URL}/api/user/profile', {
+    fetch(`${API_URL}/api/user/profile`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -203,7 +203,7 @@ export default function SettingsPage() {
       
       console.log('📤 保存配置:', normalizedConfig);
       
-      const response = await fetch('${API_URL}/api/user/update-config', {
+      const response = await fetch(`${API_URL}/api/user/update-config`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,7 +252,7 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('${API_URL}/api/user/change-password', {
+      const response = await fetch(`${API_URL}/api/user/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -114,7 +114,7 @@ export default function RegisterUploadPage() {
 
         console.log('📤 上传文件:', fileData.file.name, '门店ID:', storeId);
 
-        const response = await fetch('${API_URL}/api/menu/upload', {
+        const response = await fetch(`${API_URL}/api/menu/upload`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

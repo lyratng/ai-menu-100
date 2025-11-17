@@ -118,7 +118,7 @@ export default function HomePage() {
       } else {
         console.warn('⚠️ 用户数据中没有defaultConfig.lunch，尝试从API获取');
         // 如果localStorage中没有配置，尝试从API获取
-        fetch('${API_URL}/api/user/profile', {
+        fetch(`${API_URL}/api/user/profile`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
