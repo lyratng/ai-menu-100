@@ -224,6 +224,52 @@ export default function AdminLoginPage() {
               >
                 {isLoading ? '登录中...' : '登录'}
               </Button>
+              
+              {/* 临时快捷登录按钮 - 绕过缓存问题 */}
+              <Button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('https://api.ai-menu.tech/api/admin/login', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ username, password }),
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                      localStorage.setItem('admin_token', data.token);
+                      localStorage.setItem('admin_user', JSON.stringify(data.user));
+                      router.push('/admin/dashboard');
+                    } else {
+                      setError(data.message || '登录失败');
+                    }
+                  } catch (err: any) {
+                    setError(err.message || '登录失败');
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  height: '48px',
+                  marginTop: '12px',
+                  background: '#10B981',
+                  color: '#FFFFFF',
+                  fontSize: '16px',
+                  fontWeight: '400',
+                  letterSpacing: '0.5px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#059669';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#10B981';
+                }}
+              >
+                🚀 快捷登录（临时）
+              </Button>
             </form>
           </CardContent>
         </Card>
