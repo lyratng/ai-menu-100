@@ -13,6 +13,9 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 版本标识 - v2024.11.17 - 修复登录API路径
+  console.log('🔧 Admin Login Page v2024.11.17 - Using /api/admin/login');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
