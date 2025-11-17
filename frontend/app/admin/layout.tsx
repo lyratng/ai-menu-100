@@ -43,12 +43,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 🔒 关键安全检查：登录页面直接返回，不显示任何布局
-  if (pathname === '/admin/login') {
-    return <>{children}</>;
-  }
+  // 检查是否是登录页面
+  const isLoginPage = pathname === '/admin/login';
 
   useEffect(() => {
+    // 登录页面不需要认证检查
+    if (isLoginPage) {
+      setIsLoading(false);
+      return;
+    }
+
     // 检查管理员登录状态
     const adminToken = localStorage.getItem('admin_token');
     const adminUser = localStorage.getItem('admin_user');
@@ -68,13 +72,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setIsAuthenticated(true);
     }
     setIsLoading(false);
-  }, [pathname, router]);
+  }, [pathname, router, isLoginPage]);
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
     router.push('/admin/login');
   };
+
+  // 🔒 登录页面：不显示任何布局，直接返回内容
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   // 加载中 - 显示加载界面，不显示侧边栏
   if (isLoading) {
