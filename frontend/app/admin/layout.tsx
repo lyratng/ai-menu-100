@@ -43,14 +43,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // 🔒 关键安全检查：登录页面直接返回，不显示任何布局
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
+
   useEffect(() => {
     // 检查管理员登录状态
     const adminToken = localStorage.getItem('admin_token');
     const adminUser = localStorage.getItem('admin_user');
 
-    if (pathname !== '/admin/login' && (!adminToken || !adminUser)) {
+    console.log('🔐 Admin Layout - 认证检查:', { 
+      pathname, 
+      hasToken: !!adminToken, 
+      hasUser: !!adminUser 
+    });
+
+    if (!adminToken || !adminUser) {
+      console.log('❌ 未登录，重定向到登录页');
       router.push('/admin/login');
+      setIsAuthenticated(false);
     } else {
+      console.log('✅ 已登录');
       setIsAuthenticated(true);
     }
     setIsLoading(false);
@@ -62,12 +76,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/admin/login');
   };
 
-  // 登录页面不显示布局
-  if (pathname === '/admin/login') {
-    return <>{children}</>;
-  }
-
-  // 加载中
+  // 加载中 - 显示加载界面，不显示侧边栏
   if (isLoading) {
     return (
       <div style={{
@@ -77,14 +86,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         justifyContent: 'center',
         background: '#F5F5F0'
       }}>
-        <div style={{ fontSize: '18px', color: '#666' }}>加载中...</div>
+        <div style={{ fontSize: '18px', color: '#666' }}>验证登录状态...</div>
       </div>
     );
   }
 
-  // 未认证
+  // 未认证 - 不显示任何内容，等待重定向
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#F5F5F0'
+      }}>
+        <div style={{ fontSize: '18px', color: '#666' }}>跳转到登录页...</div>
+      </div>
+    );
   }
 
   return (
