@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ChevronDown, ChevronUp, Save, Lock, Settings as SettingsIcon } from 'lucide-react';
 import ParseStatusBar from '@/components/ParseStatusBar';
+import { API_URL } from '@/lib/config';
 
 interface DefaultConfig {
   breakfast: {
@@ -80,7 +81,7 @@ export default function SettingsPage() {
     }
 
     // 获取用户信息和默认配置
-    fetch('http://localhost:8080/api/user/profile', {
+    fetch('${API_URL}/api/user/profile', {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
@@ -202,7 +203,7 @@ export default function SettingsPage() {
       
       console.log('📤 保存配置:', normalizedConfig);
       
-      const response = await fetch('http://localhost:8080/api/user/update-config', {
+      const response = await fetch('${API_URL}/api/user/update-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -251,7 +252,7 @@ export default function SettingsPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/api/user/change-password', {
+      const response = await fetch('${API_URL}/api/user/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { API_URL } from '@/lib/config';
 
 interface MealConfig {
   [key: string]: number;
@@ -135,7 +136,7 @@ export default function RegisterConfigPage() {
       const token = sessionStorage.getItem('registerToken');
       if (token) {
         console.log('📤 调用API更新配置到数据库');
-        const response = await fetch('http://localhost:8080/api/user/update-config', {
+        const response = await fetch(`${API_URL}/api/user/update-config`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

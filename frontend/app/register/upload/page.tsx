@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, X, FileSpreadsheet, CheckCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { InfoIcon } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface UploadedFile {
   id: string;
@@ -113,7 +114,7 @@ export default function RegisterUploadPage() {
 
         console.log('📤 上传文件:', fileData.file.name, '门店ID:', storeId);
 
-        const response = await fetch('http://localhost:8080/api/menu/upload', {
+        const response = await fetch('${API_URL}/api/menu/upload', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,

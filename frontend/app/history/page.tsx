@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import ParseStatusBar from '@/components/ParseStatusBar';
 import MenuUploadDialog from '@/components/MenuUploadDialog';
+import { API_URL } from '@/lib/config';
 
 interface Menu {
   id: string;
@@ -68,7 +69,7 @@ export default function HistoryPage() {
 
   const fetchGeneratedMenus = async (token: string) => {
     try {
-      const response = await fetch('http://localhost:8080/api/menu/history?source_type=generated&limit=10', {
+      const response = await fetch('${API_URL}/api/menu/history?source_type=generated&limit=10', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -85,7 +86,7 @@ export default function HistoryPage() {
 
   const fetchUploadedMenus = async (token: string) => {
     try {
-      const response = await fetch('http://localhost:8080/api/menu/history?source_type=uploaded&limit=50', {
+      const response = await fetch('${API_URL}/api/menu/history?source_type=uploaded&limit=50', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -107,7 +108,7 @@ export default function HistoryPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:8080/api/menu/${menuId}`, {
+      const response = await fetch(`${API_URL}/api/menu/${menuId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

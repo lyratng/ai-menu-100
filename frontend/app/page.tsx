@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { generateMenu } from '@/lib/api';
 import { X } from 'lucide-react';
 import ParseStatusBar from '@/components/ParseStatusBar';
+import { API_URL } from '@/lib/config';
 
 export default function HomePage() {
   const router = useRouter();
@@ -117,7 +118,7 @@ export default function HomePage() {
       } else {
         console.warn('⚠️ 用户数据中没有defaultConfig.lunch，尝试从API获取');
         // 如果localStorage中没有配置，尝试从API获取
-        fetch('http://localhost:8080/api/user/profile', {
+        fetch('${API_URL}/api/user/profile', {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
