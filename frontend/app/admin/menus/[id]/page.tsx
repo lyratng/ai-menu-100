@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Trash2, ChevronDown } from 'lucide-react';
 import { exportToJSON, exportToCSV, exportToExcel, formatMenuForExport } from '@/lib/exportUtils';
+import { API_URL } from '@/lib/config';
 
 interface MenuDetail {
   id: string;
@@ -38,7 +39,7 @@ export default function MenuDetailPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/menus/${params.id}`, {
+      const response = await fetch(`${API_URL}/api/admin/menus/${params.id}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -59,7 +60,7 @@ export default function MenuDetailPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/menus/${params.id}`, {
+      const response = await fetch(`${API_URL}/api/admin/menus/${params.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });

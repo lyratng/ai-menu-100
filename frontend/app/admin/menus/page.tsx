@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Search, Eye, Trash2, Download, Filter, ChevronDown, RefreshCw, Check, X } from 'lucide-react';
 import { exportToCSV, exportToExcel } from '@/lib/exportUtils';
+import { API_URL } from '@/lib/config';
 
 interface Menu {
   id: string;
@@ -58,7 +59,7 @@ export default function AdminMenusPage() {
   const fetchStores = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/stores?pageSize=1000`, {
+      const response = await fetch(`${API_URL}/api/admin/stores?pageSize=1000`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       const data = await response.json();
@@ -81,7 +82,7 @@ export default function AdminMenusPage() {
         ...(statusFilter && { status: statusFilter }),
       });
 
-      const response = await fetch(`http://localhost:8080/api/admin/menus?${params}`, {
+      const response = await fetch(`${API_URL}/api/admin/menus?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -108,7 +109,7 @@ export default function AdminMenusPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/menus/${menu.id}`, {
+      const response = await fetch(`${API_URL}/api/admin/menus/${menu.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });

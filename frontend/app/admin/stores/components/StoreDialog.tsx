@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { X } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface StoreDialogProps {
   isOpen: boolean;
@@ -82,8 +83,8 @@ export default function StoreDialog({ isOpen, onClose, onSuccess, store }: Store
     try {
       const token = localStorage.getItem('admin_token');
       const url = isEditMode 
-        ? `http://localhost:8080/api/admin/stores/${store.id}`
-        : 'http://localhost:8080/api/admin/stores';
+        ? `${API_URL}/api/admin/stores/${store.id}`
+        : `${API_URL}/api/admin/stores`;
       
       const body: any = {
         storeName: storeName.trim(),

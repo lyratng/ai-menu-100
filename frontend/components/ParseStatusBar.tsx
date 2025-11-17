@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, ChevronDown, ChevronUp, RefreshCw, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface ParseStatus {
   menuId: string;
@@ -39,7 +40,7 @@ export default function ParseStatusBar({ onClose }: ParseStatusBarProps) {
   useEffect(() => {
     const fetchParseStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/menu/parse-status', {
+        const response = await fetch(`${API_URL}/api/menu/parse-status`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -83,7 +84,7 @@ export default function ParseStatusBar({ onClose }: ParseStatusBarProps) {
 
   const handleRetry = async (menuId: string) => {
     try {
-      await fetch(`http://localhost:8080/api/menu/${menuId}/retry-parse`, {
+      await fetch(`${API_URL}/api/menu/${menuId}/retry-parse`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -96,7 +97,7 @@ export default function ParseStatusBar({ onClose }: ParseStatusBarProps) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedDismissed));
       
       // 立即刷新状态
-      const response = await fetch('http://localhost:8080/api/menu/parse-status', {
+      const response = await fetch(`${API_URL}/api/menu/parse-status`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },

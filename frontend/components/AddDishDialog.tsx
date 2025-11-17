@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { X } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface AddDishDialogProps {
   onClose: () => void;
@@ -40,7 +41,7 @@ export function AddDishDialog({ onClose, onSuccess }: AddDishDialogProps) {
     setSubmitting(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch('http://localhost:8080/api/admin/dishes/common', {
+      const response = await fetch(`${API_URL}/api/admin/dishes/common`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

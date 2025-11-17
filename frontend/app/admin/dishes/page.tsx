@@ -11,6 +11,7 @@ import { BulkUploadDishDialog } from '@/components/BulkUploadDishDialog';
 import { AddDishDialog } from '@/components/AddDishDialog';
 import { FloatingActionButton } from '@/components/FloatingActionButton';
 import { BulkActionToolbar } from '@/components/BulkActionToolbar';
+import { API_URL } from '@/lib/config';
 
 interface Dish {
   id: string;
@@ -72,7 +73,7 @@ export default function DishesPage() {
   const fetchStores = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch('http://localhost:8080/api/admin/stores?pageSize=1000', {
+      const response = await fetch(`${API_URL}/api/admin/stores?pageSize=1000`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -101,7 +102,7 @@ export default function DishesPage() {
         source: dishSource, // 新增：指定查询通用菜库还是食堂菜库
       });
 
-      const response = await fetch(`http://localhost:8080/api/admin/dishes?${params}`, {
+      const response = await fetch(`${API_URL}/api/admin/dishes?${params}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -123,7 +124,7 @@ export default function DishesPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/dishes/${id}?source=${dishSource}`, {
+      const response = await fetch(`${API_URL}/api/admin/dishes/${id}?source=${dishSource}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -178,7 +179,7 @@ export default function DishesPage() {
     try {
       const token = localStorage.getItem('admin_token');
       const deletePromises = Array.from(selectedIds).map(id =>
-        fetch(`http://localhost:8080/api/admin/dishes/${id}?source=${dishSource}`, {
+        fetch(`${API_URL}/api/admin/dishes/${id}?source=${dishSource}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` },
         })

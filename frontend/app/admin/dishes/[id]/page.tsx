@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trash2 } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface DishDetail {
   id: string;
@@ -47,7 +48,7 @@ export default function DishDetailPage() {
     setLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/dishes/${params.id}?source=${dishSource}`, {
+      const response = await fetch(`${API_URL}/api/admin/dishes/${params.id}?source=${dishSource}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 
@@ -68,7 +69,7 @@ export default function DishDetailPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/dishes/${params.id}?source=${source}`, {
+      const response = await fetch(`${API_URL}/api/admin/dishes/${params.id}?source=${source}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       });

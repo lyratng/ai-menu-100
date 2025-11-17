@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Upload, Download, AlertCircle, CheckCircle2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { API_URL } from '@/lib/config';
 
 interface BulkUploadDishDialogProps {
   onClose: () => void;
@@ -115,7 +116,7 @@ export function BulkUploadDishDialog({ onClose, onSuccess }: BulkUploadDishDialo
     setUploading(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch('http://localhost:8080/api/admin/dishes/common/bulk-upload', {
+      const response = await fetch(`${API_URL}/api/admin/dishes/common/bulk-upload`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ export function BulkUploadDishDialog({ onClose, onSuccess }: BulkUploadDishDialo
   const downloadTemplate = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch('http://localhost:8080/api/admin/dishes/common/template', {
+      const response = await fetch(`${API_URL}/api/admin/dishes/common/template`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
 

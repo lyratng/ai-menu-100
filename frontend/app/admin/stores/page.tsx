@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Search, Filter, Edit, Trash2, Power, PowerOff, Download, Upload, Settings, Check, X } from 'lucide-react';
 import StoreDialog from './components/StoreDialog';
 import ConfigDialog from './components/ConfigDialog';
+import { API_URL } from '@/lib/config';
 
 interface Store {
   id: string;
@@ -43,7 +44,7 @@ export default function AdminStoresPage() {
         ...(search && { search }),
       });
 
-      const response = await fetch(`http://localhost:8080/api/admin/stores?${params}`, {
+      const response = await fetch(`${API_URL}/api/admin/stores?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -104,7 +105,7 @@ export default function AdminStoresPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/stores/${store.id}`, {
+      const response = await fetch(`${API_URL}/api/admin/stores/${store.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -132,7 +133,7 @@ export default function AdminStoresPage() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/stores/${store.id}`, {
+      const response = await fetch(`${API_URL}/api/admin/stores/${store.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -155,7 +156,7 @@ export default function AdminStoresPage() {
     // 获取门店详情（包含default_config）
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/stores/${store.id}`, {
+      const response = await fetch(`${API_URL}/api/admin/stores/${store.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
+import { API_URL } from '@/lib/config';
 
 interface ConfigDialogProps {
   storeId: string;
@@ -70,7 +71,7 @@ export default function ConfigDialog({
   const handleSave = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`http://localhost:8080/api/admin/stores/${storeId}/config`, {
+      const response = await fetch(`${API_URL}/api/admin/stores/${storeId}/config`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
