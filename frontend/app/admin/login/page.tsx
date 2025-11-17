@@ -22,6 +22,9 @@ export default function AdminLoginPage() {
     setError('');
     setIsLoading(true);
 
+    console.log('🎯 提交登录请求到:', `${API_URL}/api/admin/login`);
+    console.log('🔑 用户名:', username);
+
     try {
       const response = await fetch(`${API_URL}/api/admin/login`, {
         method: 'POST',
@@ -30,6 +33,8 @@ export default function AdminLoginPage() {
         },
         body: JSON.stringify({ username, password }),
       });
+      
+      console.log('📡 响应状态:', response.status);
 
       const data = await response.json();
 
