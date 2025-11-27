@@ -58,6 +58,7 @@ export default function RegisterUploadPage() {
       'application/vnd.ms-excel': ['.xls'],
     },
     maxSize: 10 * 1024 * 1024, // 10MB
+    multiple: false, // 改为单文件上传，避免移动端兼容性问题
   });
 
   const removeFile = (id: string) => {
@@ -246,7 +247,7 @@ export default function RegisterUploadPage() {
                   拖拽文件到此处，或点击选择文件
                 </p>
                 <p className="text-sm font-light text-[#999]">
-                  支持 .xlsx 和 .xls 格式，最多8份，单个文件不超过10MB
+                  支持 .xlsx 和 .xls 格式，每次上传1个文件，可多次上传（最多8份），单个文件不超过10MB
                 </p>
               </>
             )}
